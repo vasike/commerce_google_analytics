@@ -69,6 +69,13 @@ class SendOrderAnalyticsSubscriber implements EventSubscriberInterface {
       'country' => $address->getCountryCode(),
     ];
 
+    // Allow modules to alter the transaction.
+    // They can refer to the order but may not change it.
+    $context = array(
+      'order' => $order,
+    );
+    \Drupal::moduleHandler()->alter('commerce_google_analytics_transaction', $transaction, $context);
+
     $items = [];
     foreach ($order->getItems() as $order_item) {
       $purchased_entity = $order_item->getPurchasedEntity();
@@ -88,8 +95,25 @@ class SendOrderAnalyticsSubscriber implements EventSubscriberInterface {
         $item['sku'] = 'Product: ' . $purchased_entity->bundle();
       }
 
-      $items[] = $item;
+      // Allow modules to alter the item arguments.
+      $context = array(
+        'transaction' => $transaction,
+        'order' => $order,
+      );
+      \Drupal::moduleHandler()->alter('commerce_google_analytics_item', $item, $order_item, $context);
+
+      // If the item has been removed (empty) from drupal_alter do not include:
+      if (!empty($item)) {
+        $items[] = $item;
+      }
     }
+
+    // Allow modules to alter the final items array.
+    $context = array(
+      'transaction' => $transaction,
+      'order' => $order,
+    );
+    \Drupal::moduleHandler()->alter('commerce_google_analytics_items', $items, $context);
 
     $ga_push_params = [
       'trans' => $transaction,
