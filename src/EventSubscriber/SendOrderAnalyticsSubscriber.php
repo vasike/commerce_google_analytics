@@ -3,6 +3,7 @@
 namespace Drupal\commerce_google_analytics\EventSubscriber;
 
 use Drupal\commerce_order\Entity\OrderInterface;
+use Drupal\commerce_price\Price;
 use Drupal\commerce_product\Entity\ProductVariationInterface;
 use Drupal\state_machine\Event\WorkflowTransitionEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -48,20 +49,34 @@ class SendOrderAnalyticsSubscriber implements EventSubscriberInterface {
    */
   public function buildGaPushParams(OrderInterface $order) {
     $order_total = $order->getTotalPrice();
+    $currency_code = $order_total->getCurrencyCode();
     /** @var \Drupal\profile\Entity\ProfileInterface $billing_profile */
     $billing_profile = $order->getBillingProfile();
     /** @var \Drupal\address\AddressInterface $address */
     $address = $billing_profile->get('address')->first();
-    // ToDo: tax and shipping totals.
+
+    // ToDo: tax total.
     $tax_total = 0;
+
+    // Check if the commerce_shipping module is enabled and generate the total
+    // shipping cost of the order.
     $shipping_total = 0;
+    if (\Drupal::moduleHandler()->moduleExists('commerce_shipping')) {
+      $shipping_adjustments_total = new Price('0', $currency_code);
+      foreach ($order->collectAdjustments() as $adjustment) {
+        if ($adjustment->getType() == 'shipping') {
+          $shipping_adjustments_total->add($adjustment->getAmount());
+        }
+      }
+      $shipping_total = $shipping_adjustments_total->getNumber();
+    }
 
     // Build the transaction array.
     $transaction = [
       'order_id' => $order->id(),
       'affiliation' => $order->getStore()->label(),
       'total' => $order_total->getNumber(),
-      'currency' => $order_total->getCurrencyCode(),
+      'currency' => $currency_code,
       'total_tax' => $tax_total,
       'total_shipping' => $shipping_total,
       'city' => $address->getLocality(),
