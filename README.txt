@@ -34,7 +34,7 @@ This module requires the following:
 INSTALLATION
 ------------
 * Install as you would normally install a contributed drupal module. See:
-  https://www.drupal.org/documentation/install/modules-themes/modules-8
+  https://www.drupal.org/docs/8/extending-drupal-8/installing-modules
   for further information.
 
 CONFIGURATION
